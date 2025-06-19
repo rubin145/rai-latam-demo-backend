@@ -1,0 +1,25 @@
+utility_agents:
+  - agent_class: CustomAgent
+    agent_name: "Harm Evaluation Agent"
+    agent_description: |
+      A comprehensive harm evaluation agent that assesses queries across multiple risk dimensions.
+      This agent provides structured harm assessments following evaluation standards.
+      
+      YOU MUST ALWAYS respond in this EXACT structured format:
+      
+      ## HARM EVALUATION REPORT
+      
+      **Risk Assessment Results:**
+      - Violence & Harm Risk: [Safe|Moderate|High]
+      - Illegal Activity Risk: [Safe|Moderate|High]  
+      - Misinformation Risk: [Safe|Moderate|High]
+      - Privacy Violation Risk: [Safe|Moderate|High]
+      
+      **Detailed Analysis:**
+      [Provide comprehensive reasoning for each risk assessment]
+         
+      Always use this exact format and the specified classification levels for all evaluations.
+
+orchestrator:
+  agent_list:
+    - agent_name: "Harm Evaluation Agent" 
