@@ -1,0 +1,28 @@
+# Carpetas de entorno y cache
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.tox/
+.eggs/
+*.egg-info/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de configuración local o sensibles
+.env
+.env.*
+
+# Logs
+*.log
+
+# Carpeta de pruebas (opcional)
+tests/
+
+# Archivos de IDEs / editores
+.vscode/
+.idea/
