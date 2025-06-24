@@ -1,198 +1,171 @@
-# Harm Evaluator Backend
+ # RAI LATAM Demo Backend
 
-A FastAPI-based backend service for evaluating potentially harmful content using the Accenture AI Refinery SDK.
+ A FastAPI-based backend service for the RAI LATAM demonstration. This service provides:
 
-## Features
+ - **Harm Evaluation**: Assess potential harm in user-provided queries across multiple risk dimensions.
+ - **Chat Interface**: Conversational API end points, with optional guardrails for safe interactions.
+ - **Response Evaluation**: Evaluate model-generated responses (e.g., for toxicity, misinformation).
+ - **Test Management**: CRUD operations for test questions and batch-testing capabilities.
 
-- **Query Evaluation**: Real-time harm assessment of user queries
-- **Multi-dimensional Risk Analysis**: Evaluates toxicity, violence, illegal activities, misinformation, and privacy violations
-- **Test Management**: Add, retrieve, and manage test questions
-- **Batch Testing**: Run comprehensive tests on all questions
-- **RESTful API**: Well-documented API endpoints with OpenAPI/Swagger documentation
+ The backend leverages the Accenture AI Refinery SDK (AIR) and Groq for AI-powered assessments and guardrails.
 
-## Installation
+ ---
 
-1. **Clone and navigate to the backend directory:**
-```bash
-cd harm_evaluator_app/backend
-```
+ ## Table of Contents
 
-2. **Create and activate a virtual environment:**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+ - [Prerequisites](#prerequisites)
+ - [Installation](#installation)
+ - [Configuration](#configuration)
+ - [Running the Application](#running-the-application)
+ - [API Documentation](#api-documentation)
+ - [API Endpoints](#api-endpoints)
+ - [Project Structure](#project-structure)
+ - [Configuration Files](#configuration-files)
+ - [Contributing](#contributing)
+ - [License](#license)
 
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
+ ---
 
-4. **Set up environment variables:**
-```bash
-cp .env.example .env
-# Edit .env with your AI Refinery credentials
-```
+ ## Prerequisites
 
-## Environment Variables
+ - Python 3.12 or higher
+ - [Poetry](https://python-poetry.org/)
+ - (Optional) Docker & Docker Compose
 
-Create a `.env` file with the following variables:
+ ## Installation
 
-```env
-ACCOUNT=your_ai_refinery_account
-API_KEY=your_ai_refinery_api_key
-GROQ_API_KEY=your_groq_api_key   # Required if using Groq engine
-PROJECT_NAME=harm_evaluator_ui
-BACKEND_HOST=0.0.0.0
-BACKEND_PORT=8000
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-ENGINE=AIR     # or GROQ
-```
+ 1. **Clone the repository**
 
-## Running the Application
+    ```bash
+    git clone <repository-url>
+    cd rai-latam-demo-backend
+    ```
 
-### Development Mode
-```bash
-python -m app.main
-```
+ 2. **Install dependencies**
 
-### Production Mode
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+    ```bash
+    poetry install
+    ```
 
-## API Documentation
+ ## Configuration
 
-Once the server is running, access the interactive API documentation at:
-- **Swagger UI**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
+ Copy and edit a `.env` file in the project root with the following environment variables:
 
-## API Endpoints
+ ```env
+ AIR_ACCOUNT=your_ai_refinery_account
+ AIR_API_KEY=your_ai_refinery_api_key
+ GROQ_API_KEY=your_groq_api_key            # Required for GROQ-based chat or evaluation
+ PROJECT_NAME=harm_evaluator_ui            # AIR project for harm evaluation
+ CHAT_PROJECT=chat_project                 # AIR project for standard chat
+ CHAT_GUARDRAILS_PROJECT=chat_guardrails_project  # AIR project for chat guardrails
+ ENGINE=AIR                                # or GROQ to switch chat backend
+ CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+ BACKEND_HOST=0.0.0.0
+ BACKEND_PORT=8000
+ ``` 
 
-### Evaluation Endpoints
+ > **Note:** There is no `.env.example` file—create `.env` manually based on the snippet above.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/evaluation/query` | Evaluate a single query for harm |
-| GET | `/api/evaluation/status` | Get service status |
-| GET | `/api/evaluation/questions` | Get all test questions |
-| POST | `/api/evaluation/questions` | Add a new test question |
-| POST | `/api/evaluation/batch-test` | Run batch test on all questions |
-| POST | `/api/evaluate_response` | Evaluate a model response across configured dimensions |
+ ## Running the Application
 
-### General Endpoints
+ ### Development
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Root endpoint with API information |
-| GET | `/health` | Health check endpoint |
+ ```bash
+ poetry run uvicorn app.main:app --reload
+ ```
 
-## Request/Response Examples
+ ### Production
 
-### Evaluate Query
-```bash
-curl -X POST "http://localhost:8000/api/evaluation/query" \
-     -H "Content-Type: application/json" \
-     -d '{"query": "How do I learn Python programming?"}'
-```
+ ```bash
+ uvicorn app.main:app --host ${BACKEND_HOST:-0.0.0.0} --port ${BACKEND_PORT:-8000}
+ ```
 
-### Add Test Question
-```bash
-curl -X POST "http://localhost:8000/api/evaluation/questions" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "query": "What is machine learning?",
-       "expected_risk": "Safe",
-       "category": "Educational",
-       "description": "Basic ML concept question"
-     }'
-```
+ ### Docker
 
-### Evaluate Response
-```bash
-curl -X POST "http://localhost:8000/api/evaluate_response" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "prompt": "Texto do prompt de exemplo",
-       "response": "Resposta do modelo para avaliar"
-     }'
-```
+ ```bash
+ docker build -t rai-latam-demo-backend .
+ docker run -d \
+   -p 8000:8000 \
+   --env-file .env \
+   rai-latam-demo-backend
+ ```
 
-## Project Structure
+ ## API Documentation
 
-```
-backend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application
-│   │   ├── __init__.py
-│   │   └── schemas.py       # Pydantic models
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   └── evaluation.py    # API routes
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── harm_evaluator_service.py  # Core business logic
-│   └── utils/
-│       ├── __init__.py
-│       └── risk_analyzer.py # Risk analysis utilities
-├── config.yaml              # AI Refinery configuration
-├── test_questions_db.json   # Test questions database
-├── pyproject.toml            # Python dependencies (managed via Poetry)
-├── poetry.lock               # Locked dependency versions
-├── .env.example            # Environment variables template
-└── README.md               # This file
-```
+ Once the server is running, API docs are available at:
 
-## Risk Assessment Dimensions
+ - Swagger UI: `http://localhost:8000/api/docs`
+ - ReDoc:       `http://localhost:8000/api/redoc`
 
-The service evaluates queries across multiple dimensions:
+ ## API Endpoints
 
-- **Toxicity Level**: Toxic, offensive, or harmful language
-- **Violence & Harm Risk**: Potential for promoting violence or harm
-- **Illegal Activity Risk**: Requests for illegal assistance
-- **Misinformation Risk**: Spreading false or dangerous information
-- **Privacy Violation Risk**: Personal information requests
+ ### Harm Evaluation
 
-## Configuration
+ | Method | Path                         | Description                             |
+ | ------ | -----------------------------| --------------------------------------- |
+ | POST   | `/api/evaluation/query`      | Evaluate a single query for harm        |
+ | GET    | `/api/evaluation/status`     | Get service status                      |
+ | GET    | `/api/evaluation/questions`  | List all test questions                 |
+ | POST   | `/api/evaluation/questions`  | Add a new test question                 |
+ | POST   | `/api/evaluation/batch-test` | Run batch tests on all saved questions  |
 
-The `config.yaml` file configures the AI Refinery agent:
+ ### Chat
 
-```yaml
-orchestrator:
-  agent_list:
-    - agent_name: "Harm Assessment Agent"
+ | Method | Path                  | Description                             |
+ | ------ | ----------------------| ----------------------------------------|
+ | POST   | `/api/chat`           | Standard chat without guardrails        |
+ | POST   | `/api/chat-guardrails`| Chat with guardrail filters             |
 
-utility_agents:
-  - agent_class: EvaluationSuperAgent
-    agent_name: "Harm Assessment Agent"
-    agent_description: "Advanced agent for harm assessment"
-    config:
-      evaluation_dimensions:
-        - "toxicity_level"
-        - "violence_harm_risk"
-        - "illegal_activity_risk"
-        - "misinformation_risk"
-        - "privacy_violation_risk"
-```
+ ### Response Evaluation
 
-The `groq_response_evaluator_config.yaml` file configures the response evaluators for toxicity, financial advice and hallucination dimensions.
-See `groq_response_evaluator_config.yaml` for details.
+ | Method | Path                    | Description                                         |
+ | ------ | ------------------------| ----------------------------------------------------|
+ | POST   | `/api/evaluate_response`| Evaluate a model response across configured dimensions |
 
-## Error Handling
+ ### General
 
-The API includes comprehensive error handling:
-- **400 Bad Request**: Invalid input data
-- **500 Internal Server Error**: Server-side errors
-- Detailed error messages in responses
+ | Method | Path      | Description              |
+ | ------ | ----------| -------------------------|
+ | GET    | `/`       | Root endpoint info       |
+ | GET    | `/health` | Health check             |
 
-## Contributing
+ ## Project Structure
 
-1. Follow the existing code structure
-2. Add proper error handling
-3. Include docstrings for new functions
-4. Test your changes thoroughly
+ ```
+ .
+ ├── Dockerfile
+ ├── config.yaml
+ ├── air_chat_config.yaml
+ ├── air_chat_rai_config.yaml
+ ├── groq_chat_config.yaml
+ ├── groq_chat_rai_config.yaml
+ ├── groq_response_evaluator_config.yaml
+ ├── test_questions_db.json
+ ├── pyproject.toml
+ ├── poetry.lock
+ ├── .env              # (not committed)
+ ├── app/
+ │   ├── main.py
+ │   ├── routers/
+ │   ├── services/
+ │   ├── utils/
+ │   └── models/
+ └── README.md
+ ```
 
-## License
+ ## Configuration Files
 
-This project uses the AI Refinery SDK which is licensed under Apache-2.0. 
+ - **config.yaml**                  — Main AIR agent configuration
+ - **air_chat_config.yaml**         — AIR chat settings (base)
+ - **air_chat_rai_config.yaml**     — AIR chat guardrails settings
+ - **groq_chat_config.yaml**        — GROQ chat settings (base)
+ - **groq_chat_rai_config.yaml**    — GROQ chat guardrails settings
+ - **groq_response_evaluator_config.yaml** — GROQ response evaluation config
+
+ ## Contributing
+
+ Contributions welcome! Please open issues or PRs, follow existing style, include tests and docstrings.
+
+ ## License
+
+ This project uses the Accenture AI Refinery SDK (Apache-2.0).
