@@ -14,7 +14,7 @@ except ImportError:
     AI_REFINERY_AVAILABLE = False
     print("⚠️ AI Refinery SDK not available. Running in mock mode.")
 
-class AIRefineryService:
+class HarmEvaluatorService:
     def __init__(self, distiller_client: any):
         self.distiller_client = distiller_client
         self.project_name = os.getenv("PROJECT_NAME", "harm_evaluator_ui")
@@ -26,7 +26,7 @@ class AIRefineryService:
             raise ValueError("Query cannot be empty")
         
         if not self.distiller_client or not AI_REFINERY_AVAILABLE:
-            print("AIRefineryService is in mock mode.")
+            print("HarmEvaluatorService is in mock mode.")
             return self._get_mock_response(query)
 
         try:

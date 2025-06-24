@@ -1,4 +1,3 @@
-import os
 import uuid
 from typing import Tuple
 
@@ -7,9 +6,10 @@ try:
     AI_REFINERY_AVAILABLE = True
 except ImportError:
     AI_REFINERY_AVAILABLE = False
-    print("⚠️ AI Refinery SDK not available. ChatService will run in mock mode.")
+    print("⚠️ AI Refinery SDK not available. AIRChatService will run in mock mode.")
 
-class ChatService:
+class AIRChatService:
+    """Chat service implementation using the AI Refinery SDK."""
     def __init__(self, distiller_client: any, project_name: str):
         self.distiller_client = distiller_client
         self.project_name = project_name
@@ -19,7 +19,7 @@ class ChatService:
             session_id = str(uuid.uuid4())
 
         if not self.distiller_client or not AI_REFINERY_AVAILABLE:
-            print(f"ChatService for project '{self.project_name}' is in mock mode.")
+            print(f"AIRChatService for project '{self.project_name}' is in mock mode.")
             return f"Mock response for {self.project_name}: {query}", session_id
 
         try:
@@ -32,9 +32,12 @@ class ChatService:
                         break
 
                 if not ai_response:
-                    return "Sorry, I couldn't get a response from the chat service.", session_id
+                    return (
+                        "Sorry, I couldn't get a response from the AIR chat service.",
+                        session_id,
+                    )
 
                 return ai_response, session_id
         except Exception as e:
-            print(f"Error during AI Refinery chat query for project '{self.project_name}': {e}")
+            print(f"Error during AIR chat query for project '{self.project_name}': {e}")
             return "An error occurred while processing your request.", session_id

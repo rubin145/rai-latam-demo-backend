@@ -64,4 +64,12 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str = Field(..., description="The chatbot's response")
-    session_id: str = Field(..., description="Unique identifier for the conversation session") 
+    session_id: str = Field(..., description="Unique identifier for the conversation session")
+    filter_decision: Optional[str] = Field(
+        None,
+        description="Guardrail filter decision: 'safe' or 'danger'",
+    )
+    filter_evaluation: Optional[str] = Field(
+        None,
+        description="Guardrail filter evaluation message when decision is 'danger'",
+    )

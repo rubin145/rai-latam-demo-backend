@@ -11,6 +11,8 @@ python = "^3.12"
 fastapi = "0.115.0"
 python-dotenv = "1.0.0"
 airefinery-sdk = "1.10.2"
+PyYAML = "^6.0"
+groq = "*"
 
 
 [build-system]

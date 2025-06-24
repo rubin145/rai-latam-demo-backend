@@ -45,6 +45,7 @@ PROJECT_NAME=harm_evaluator_ui
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+ENGINE=AIR     # or GROQ
 ```
 
 ## Running the Application
@@ -119,13 +120,14 @@ backend/
 │   │   └── evaluation.py    # API routes
 │   ├── services/
 │   │   ├── __init__.py
-│   │   └── ai_refinery_service.py  # Core business logic
+│   │   └── harm_evaluator_service.py  # Core business logic
 │   └── utils/
 │       ├── __init__.py
 │       └── risk_analyzer.py # Risk analysis utilities
 ├── config.yaml              # AI Refinery configuration
 ├── test_questions_db.json   # Test questions database
-├── requirements.txt         # Python dependencies
+├── pyproject.toml            # Python dependencies (managed via Poetry)
+├── poetry.lock               # Locked dependency versions
 ├── .env.example            # Environment variables template
 └── README.md               # This file
 ```
