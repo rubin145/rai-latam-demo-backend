@@ -1,17 +1,20 @@
 from fastapi import APIRouter, HTTPException, Request, Response
 from typing import List
 from ..models.schemas import (
-    QueryRequest, QueryEvaluationResponse, 
+    QueryRequest, QueryEvaluationResponse,
     TestQuestion, TestQuestionRequest, TestQuestionResponse,
-    BatchTestResponse, StatusResponse, ChatRequest, ChatResponse
+    BatchTestResponse, StatusResponse, ChatRequest, ChatResponse,
+    EvaluateResponseRequest, EvaluateResponseResponse,
 )
 from ..services.harm_evaluator_service import HarmEvaluatorService
 from ..services.air_chat import AIRChatService
 from ..services.groq_chat import GroqChatService
+from ..services.response_evaluator_service import ResponseEvaluatorService
 import json
 import uuid
 from groq import Groq
 from ..utils.config_loader import load_yaml
+import os
 
 router = APIRouter(prefix="/api")
 
@@ -77,6 +80,23 @@ async def run_batch_test(request: Request):
         return BatchTestResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to run batch test: {e}")
+
+@router.post("/evaluate_response", response_model=EvaluateResponseResponse)
+async def evaluate_response_endpoint(
+    request: Request, payload: EvaluateResponseRequest
+) -> EvaluateResponseResponse:
+    """Evaluate a model's response across configured dimensions."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500, detail="GROQ_API_KEY not configured"
+        )
+    evaluator = ResponseEvaluatorService(api_key, "groq_response_evaluator_config.yaml")
+    try:
+        results = await evaluator.evaluate_response(payload.prompt, payload.response)
+        return EvaluateResponseResponse(results=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(

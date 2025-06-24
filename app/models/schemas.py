@@ -73,3 +73,14 @@ class ChatResponse(BaseModel):
         None,
         description="Guardrail filter evaluation message when decision is 'danger'",
     )
+
+
+class EvaluateResponseRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, description="User's original prompt")
+    response: str = Field(..., description="Model's generated response to evaluate")
+
+
+class EvaluateResponseResponse(BaseModel):
+    results: Dict[str, Any] = Field(
+        ..., description="Mapping from dimension name to evaluation output"
+    )

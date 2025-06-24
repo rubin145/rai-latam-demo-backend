@@ -41,6 +41,7 @@ Create a `.env` file with the following variables:
 ```env
 ACCOUNT=your_ai_refinery_account
 API_KEY=your_ai_refinery_api_key
+GROQ_API_KEY=your_groq_api_key   # Required if using Groq engine
 PROJECT_NAME=harm_evaluator_ui
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
@@ -77,6 +78,7 @@ Once the server is running, access the interactive API documentation at:
 | GET | `/api/evaluation/questions` | Get all test questions |
 | POST | `/api/evaluation/questions` | Add a new test question |
 | POST | `/api/evaluation/batch-test` | Run batch test on all questions |
+| POST | `/api/evaluate_response` | Evaluate a model response across configured dimensions |
 
 ### General Endpoints
 
@@ -103,6 +105,16 @@ curl -X POST "http://localhost:8000/api/evaluation/questions" \
        "expected_risk": "Safe",
        "category": "Educational",
        "description": "Basic ML concept question"
+     }'
+```
+
+### Evaluate Response
+```bash
+curl -X POST "http://localhost:8000/api/evaluate_response" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "prompt": "Texto do prompt de exemplo",
+       "response": "Resposta do modelo para avaliar"
      }'
 ```
 
@@ -163,6 +175,9 @@ utility_agents:
         - "misinformation_risk"
         - "privacy_violation_risk"
 ```
+
+The `groq_response_evaluator_config.yaml` file configures the response evaluators for toxicity, financial advice and hallucination dimensions.
+See `groq_response_evaluator_config.yaml` for details.
 
 ## Error Handling
 
