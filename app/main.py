@@ -13,6 +13,7 @@ try:
 except ImportError:
     AI_REFINERY_AVAILABLE = False
 
+
 # Load environment variables
 load_dotenv()
 
@@ -44,8 +45,8 @@ def startup_event():
             # Create/update all necessary projects
             print("Applying AI Refinery project configurations...")
             client.create_project(config_path="config.yaml", project=os.getenv("PROJECT_NAME", "harm_evaluator_ui"))
-            client.create_project(config_path="chat_config.yml", project="chat_project")
-            client.create_project(config_path="chat_rai_config.yml", project="chat_guardrails_project")
+            client.create_project(config_path="chat_config.yaml", project="chat_project")
+            client.create_project(config_path="chat_rai_config.yaml", project="chat_guardrails_project")
             print("AI Refinery client and projects initialized successfully.")
 
         except Exception as e:

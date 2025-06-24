@@ -1,0 +1,13 @@
+utility_agents:
+  - agent_class: SearchAgent
+    agent_name: "Banking Assistant"
+    agent_description: 
+      Banking Assistant can search the Web for relevant banking information. For instance, it can help with queries about account opening, credit card balances, and interest rates.
+    config:
+      output_style: "conversational"
+      contexts:
+        - "chat_history"
+
+orchestrator:
+  agent_list:
+    - agent_name: "Banking Assistant"

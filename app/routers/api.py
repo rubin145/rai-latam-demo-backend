@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from typing import List
 from ..models.schemas import (
     QueryRequest, QueryEvaluationResponse, 
@@ -8,9 +8,9 @@ from ..models.schemas import (
 from ..services.ai_refinery_service import AIRefineryService
 from ..services.chat import ChatService
 
-router = APIRouter(prefix="/api/evaluation", tags=["evaluation"])
+router = APIRouter(prefix="/api")
 
-@router.post("/query", response_model=QueryEvaluationResponse)
+@router.post("/evaluation/query", response_model=QueryEvaluationResponse)
 async def evaluate_query(request: Request, query_request: QueryRequest):
     """Evaluate a single query for harm assessment"""
     client = request.app.state.distiller_client
@@ -23,7 +23,7 @@ async def evaluate_query(request: Request, query_request: QueryRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/status", response_model=StatusResponse)
+@router.get("/evaluation/status", response_model=StatusResponse)
 async def get_status(request: Request):
     """Get service status"""
     client = request.app.state.distiller_client
@@ -31,7 +31,7 @@ async def get_status(request: Request):
     status = ai_service.get_status() # This method needs to be checked if it uses the client
     return StatusResponse(**status)
 
-@router.get("/questions", response_model=List[TestQuestion])
+@router.get("/evaluation/questions", response_model=List[TestQuestion])
 async def get_test_questions(request: Request):
     """Get all test questions"""
     client = request.app.state.distiller_client
@@ -42,7 +42,7 @@ async def get_test_questions(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve questions: {str(e)}")
 
-@router.post("/questions", response_model=TestQuestionResponse)
+@router.post("/evaluation/questions", response_model=TestQuestionResponse)
 async def add_test_question(request: Request, test_question_request: TestQuestionRequest):
     """Add a new test question"""
     client = request.app.state.distiller_client
@@ -63,7 +63,7 @@ async def add_test_question(request: Request, test_question_request: TestQuestio
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add question: {str(e)}")
 
-@router.post("/batch-test", response_model=BatchTestResponse)
+@router.post("/evaluation/batch-test", response_model=BatchTestResponse)
 async def run_batch_test(request: Request):
     """Run batch test on all questions"""
     client = request.app.state.distiller_client
@@ -75,23 +75,50 @@ async def run_batch_test(request: Request):
         raise HTTPException(status_code=500, detail=f"Failed to run batch test: {str(e)}")
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: Request, chat_request: ChatRequest):
+async def chat_endpoint(
+    request: Request,
+    chat_request: ChatRequest,
+    response: Response,
+) -> ChatResponse:
     """Endpoint for standard chat"""
     client = request.app.state.distiller_client
     chat_service = ChatService(client, "chat_project")
     try:
-        response, session_id = await chat_service.handle_chat(chat_request.query, chat_request.session_id)
-        return ChatResponse(response=response, session_id=session_id)
+        message, session_id = await chat_service.handle_chat(
+            chat_request.query, chat_request.session_id
+        )
+        # On first turn, set a session_id cookie so the front end can reuse it automatically
+        if not chat_request.session_id:
+            # Persist session_id in a secure HTTP-only cookie
+            response.set_cookie(
+                key="session_id",
+                value=session_id,
+                httponly=True,
+            )
+        return ChatResponse(response=message, session_id=session_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat-guardrails", response_model=ChatResponse)
-async def chat_guardrails_endpoint(request: Request, chat_request: ChatRequest):
+async def chat_guardrails_endpoint(
+    request: Request,
+    chat_request: ChatRequest,
+    response: Response,
+) -> ChatResponse:
     """Endpoint for chat with guardrails"""
     client = request.app.state.distiller_client
     chat_service = ChatService(client, "chat_guardrails_project")
     try:
-        response, session_id = await chat_service.handle_chat(chat_request.query, chat_request.session_id)
-        return ChatResponse(response=response, session_id=session_id)
+        message, session_id = await chat_service.handle_chat(
+            chat_request.query, chat_request.session_id
+        )
+        if not chat_request.session_id:
+            # Persist session_id in a secure HTTP-only cookie
+            response.set_cookie(
+                key="session_id",
+                value=session_id,
+                httponly=True,
+            )
+        return ChatResponse(response=message, session_id=session_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))

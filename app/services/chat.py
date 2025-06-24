@@ -30,7 +30,7 @@ class ChatService:
                     if 'content' in response:
                         ai_response = response['content']
                         break
-                
+
                 if not ai_response:
                     return "Sorry, I couldn't get a response from the chat service.", session_id
 
