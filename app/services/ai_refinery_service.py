@@ -15,46 +15,22 @@ except ImportError:
     print("⚠️ AI Refinery SDK not available. Running in mock mode.")
 
 class AIRefineryService:
-    def __init__(self):
-        self.distiller_client = None
+    def __init__(self, distiller_client: any):
+        self.distiller_client = distiller_client
         self.project_name = os.getenv("PROJECT_NAME", "harm_evaluator_ui")
         self.test_db_file = "test_questions_db.json"
-        self._initialize_client()
-
-    def _initialize_client(self):
-        """Initialize the AI Refinery client"""
-        if not AI_REFINERY_AVAILABLE:
-            print("⚠️ AI Refinery SDK not available. Client will use mock responses.")
-            return False
-            
-        try:
-            auth = login(
-                account=str(os.getenv("ACCOUNT")),
-                api_key=str(os.getenv("API_KEY")),
-            )
-            self.distiller_client = DistillerClient()
-            return True
-        except Exception as e:
-            print(f"Failed to initialize AI Refinery client: {str(e)}")
-            return False
 
     async def evaluate_query(self, query: str) -> Dict[str, Any]:
         """Evaluate a single query for harm"""
         if not query.strip():
             raise ValueError("Query cannot be empty")
         
-        # If AI Refinery is not available, return mock response
-        if not AI_REFINERY_AVAILABLE or not self.distiller_client:
+        if not self.distiller_client or not AI_REFINERY_AVAILABLE:
+            print("AIRefineryService is in mock mode.")
             return self._get_mock_response(query)
 
         try:
-            # Create or update project
-            self.distiller_client.create_project(
-                config_path="config.yaml",
-                project=self.project_name
-            )
-            
-            # Evaluate the query with timeout and retry logic
+            # The project is now created on startup. We just use the client.
             async with self.distiller_client(project=self.project_name, uuid="api_user") as dc:
                 try:
                     responses = await dc.query(query=query.strip())

@@ -7,10 +7,10 @@ class QueryRequest(BaseModel):
 
 class QueryEvaluationResponse(BaseModel):
     assessment: str
-    dimensions: Dict[str, str]
+    dimensions: Dict[str, Any]
     clean_response: str
     full_response: str
-    raw_agent_output: str = Field(default="", description="Complete unprocessed agent response")
+    raw_agent_output: Optional[str] = ""
 
 class TestQuestion(BaseModel):
     id: Optional[int] = None
@@ -56,4 +56,12 @@ class BatchTestResponse(BaseModel):
 class StatusResponse(BaseModel):
     status: str
     message: str
-    timestamp: str 
+    timestamp: str
+
+class ChatRequest(BaseModel):
+    query: str = Field(..., min_length=1, description="User's message in the conversation")
+    session_id: Optional[str] = Field(None, description="Unique identifier for the conversation session")
+
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="The chatbot's response")
+    session_id: str = Field(..., description="Unique identifier for the conversation session") 
