@@ -74,10 +74,18 @@ def startup_event():
 
 # Configure CORS
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+print(f"🌐 CORS Origins configured: {origins}")
+
+# Temporary hardcode for debugging - replace with origins variable after testing
+hardcoded_origins = [
+    "http://localhost:3000",
+    "https://rai-latam-demo-frontend.onrender.com",
+    "https://rai-latam-demo-frontend.onrender.com/"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=hardcoded_origins,  # Using hardcoded for debugging
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
