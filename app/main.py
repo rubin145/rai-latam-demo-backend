@@ -80,7 +80,9 @@ print(f"🌐 CORS Origins configured: {origins}")
 hardcoded_origins = [
     "http://localhost:3000",
     "https://rai-latam-demo-frontend.onrender.com",
-    "https://rai-latam-demo-frontend.onrender.com/"
+    "https://rai-latam-demo-frontend.onrender.com/",
+    "https://rai-latam-demo.onrender.com",
+    "https://rai-latam-demo.onrender.com/"
 ]
 
 app.add_middleware(
