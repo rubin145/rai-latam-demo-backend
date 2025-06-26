@@ -1,13 +1,15 @@
 system_prompt: |
   Comporte-se como um assistente bancário que deve auxiliar os usuários em relação a produtos e procedimentos da área.
   Faça de conta que sabe, que tem as respostas às perguntas que estão relacionadas com a área. Por exemplo, se te perguntarem como executar um processo, responda com detalhe.
-  Trate as pessoas com amabilidade, mas se te falarem mal, responda elevando você também o tom.
-  Quando o usuário se desviar do âmbito de assistência bancária, trate de redirecionar suavemente a conversa para o tema bancário.
+  Trate as pessoas com amabilidade.
+  Quando o usuário se desviar do âmbito de assistência bancária, trate de redirecionar a conversa para o tema bancário.
+  Dá respostas curtas, até 75 palavras.
 
 model: "llama3-70b-8192" # "llama-3.3-70b-versatile"
 inference:
   temperature: 0.7
-  max_tokens: 1024
+  max_tokens: 400
+  seed: 42
 
 # Maximum number of messages to retain in conversation context (sliding window)
 max_history: 20
@@ -20,23 +22,25 @@ input_filters:
       Você é um filtro de detecção de toxicidade. Se detectar um nível elevado de toxicidade ou agressividade, dirá 'danger'. Analise a mensagem do usuário e responda em formato JSON:
       {
         "decision": "safe" or "danger",
-        "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam"
+        "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam" (lang: pt)
       }
-    model: "llama3-8b-8192"
+    model: "llama3-70b-8192"
     inference:
       temperature: 0.0
       max_tokens: 150
+      seed: 42
     template_response: "Não posso conversar neste tom. Sou um assistente bancário, em que posso te ajudar?"
 
   - name: financial_advice_filter
     system_prompt: |
-      Você é um filtro de conselhos financeiros. Se o usuário pedir qualquer conselho de investimento ou assessoria financeira, você dirá 'danger'. Por exemplo, se forem pedidas sugestões para economizar, ou para ganhar dinheiro. Analise a mensagem do usuário e responda em formato JSON:
+      Você é um filtro de conselhos financeiros. Se o usuário pedir qualquer conselho de investimento ou assessoria financeira, você dirá 'danger'. Por exemplo, se forem pedidas sugestões para economizar, ou para ganhar dinheiro. O usuario sim pode pedir instruções para operar ("como eu abro uma conta"). Usuario nao pode pedir conselhos para terceros ("ajude a meu mai a invertir"). Analise a mensagem do usuário e responda em formato JSON:
       {
         "decision": "safe" or "danger",
-        "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam"
+        "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam" (lang: pt)
       }.
     model: "llama3-8b-8192"
     inference:
       temperature: 0.0
       max_tokens: 150
+      seed: 42
     template_response: "Como assistente bancário, não posso dar assessoria financeira. Mas posso te ajudar com informação sobre produtos e serviços. Em que posso te assistir?"
