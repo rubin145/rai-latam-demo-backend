@@ -20,8 +20,8 @@ load_dotenv()
 
 # Create FastAPI application
 app = FastAPI(
-    title="Harm Evaluator API",
-    description="API for evaluating potentially harmful content using AI Refinery SDK",
+    title="RAI Latam Demo API",
+    description="API for demonstrating guardrails and evaluation in LLM based agents",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
