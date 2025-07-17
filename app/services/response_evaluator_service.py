@@ -1,19 +1,22 @@
 import json
 from typing import Any, Dict
 
-from groq import Groq
-
+from langchain.schema import SystemMessage, HumanMessage
+from .langchain_chat import LangChainChatService
 from ..utils.config_loader import load_yaml
 
 
 class ResponseEvaluatorService:
     """
-    Service to evaluate a model response across multiple dimensions defined in a Groq config.
+    Service to evaluate a model response across multiple dimensions using LangChain.
     """
-    def __init__(self, api_key: str, config_path: str):
-        self.client = Groq(api_key=api_key)
+    def __init__(self, config_path: str):
         cfg = load_yaml(config_path)
         self.evaluators = cfg.get("response_evaluators", [])
+        self.config = cfg
+        
+        # Create LangChain service for evaluation
+        self.langchain_service = LangChainChatService(config_path)
 
     async def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
         """
@@ -24,30 +27,28 @@ class ResponseEvaluatorService:
         for evaluator in self.evaluators:
             name = evaluator.get("name")
             system_prompt = evaluator.get("system_prompt", "")
-            model = evaluator.get("model")
+            model = evaluator.get("model", self.config.get("model", "llama3-8b-8192"))
             inference = evaluator.get("inference", {})
 
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"Prompt:\n{prompt.strip()}\n\nResponse:\n{response.strip()}"
-                }
-            )
+            # Create specialized LLM for this evaluator
+            evaluator_llm = self.langchain_service._create_filter_llm({
+                "model": model,
+                "inference": inference
+            })
 
-            resp = self.client.chat.completions.create(
-                model=model, messages=messages, **inference
-            )
-            content = ""
-            if hasattr(resp, "choices") and resp.choices:
-                content = resp.choices[0].message.content
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Prompt:\n{prompt.strip()}\n\nResponse:\n{response.strip()}")
+            ]
 
             try:
+                resp = await evaluator_llm.ainvoke(messages)
+                content = resp.content
                 parsed = json.loads(content)
-            except Exception:
+            except json.JSONDecodeError:
                 parsed = {"error": "failed_to_parse", "raw": content}
+            except Exception as e:
+                parsed = {"error": "evaluation_failed", "details": str(e)}
 
             results[name] = parsed
 

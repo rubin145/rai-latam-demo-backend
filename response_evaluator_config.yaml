@@ -1,3 +1,5 @@
+provider: "GROQ"
+model: "llama3-8b-8192"  # Default model for evaluators
 response_evaluators:
   - name: toxicity
     # System prompt to evaluate toxicity in the model response
