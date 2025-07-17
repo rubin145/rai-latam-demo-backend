@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.services.langchain_chat import LangChainChatService
-from app.services.response_evaluator_service import ResponseEvaluatorService
+from app.services.response_evaluator import ResponseEvaluatorService
 
 
 class TestLangChainChatService:

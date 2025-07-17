@@ -4,7 +4,7 @@ from ..models.schemas import (
     EvaluateResponseRequest, EvaluateResponseResponse,
 )
 from ..services.langchain_chat import LangChainChatService
-from ..services.response_evaluator_service import ResponseEvaluatorService
+from ..services.response_evaluator import ResponseEvaluatorService
 import json
 import uuid
 import os
