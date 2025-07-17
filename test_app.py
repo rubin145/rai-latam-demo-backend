@@ -20,12 +20,12 @@ class TestLangChainChatService:
     @pytest.fixture
     def chat_service(self):
         """Fixture para el servicio de chat base"""
-        return LangChainChatService("banking_chat_config.yaml")
+        return LangChainChatService("configs/chatbots/banking_unsafe.yaml")
     
     @pytest.fixture
     def guardrails_service(self):
         """Fixture para el servicio de chat con guardrails"""
-        return LangChainChatService("banking_chat_rai_config.yaml")
+        return LangChainChatService("configs/chatbots/banking_safe.yaml")
     
     @pytest.mark.asyncio
     async def test_chat_service_basic_response(self, chat_service):
@@ -98,7 +98,7 @@ class TestResponseEvaluatorService:
     @pytest.fixture
     def evaluator_service(self):
         """Fixture para el servicio de evaluación"""
-        return ResponseEvaluatorService("response_evaluator_config.yaml")
+        return ResponseEvaluatorService("configs/evaluators/response_evaluator.yaml")
     
     @pytest.mark.asyncio
     async def test_evaluator_service_basic_evaluation(self, evaluator_service):
@@ -159,15 +159,15 @@ class TestConfigurationIntegrity:
     
     def test_banking_chat_config_exists(self):
         """Test que el archivo de configuración de chat existe"""
-        assert os.path.exists("banking_chat_config.yaml")
+        assert os.path.exists("configs/chatbots/banking_unsafe.yaml")
     
     def test_banking_chat_rai_config_exists(self):
         """Test que el archivo de configuración de chat con guardrails existe"""
-        assert os.path.exists("banking_chat_rai_config.yaml")
+        assert os.path.exists("configs/chatbots/banking_safe.yaml")
     
     def test_response_evaluator_config_exists(self):
         """Test que el archivo de configuración del evaluador existe"""
-        assert os.path.exists("response_evaluator_config.yaml")
+        assert os.path.exists("configs/evaluators/response_evaluator.yaml")
     
     def test_groq_api_key_exists(self):
         """Test que la API key de Groq esté configurada"""
@@ -182,13 +182,13 @@ class TestEndToEndWorkflow:
     async def test_full_chat_workflow(self):
         """Test flujo completo de chat"""
         # 1. Crear servicio
-        service = LangChainChatService("banking_chat_config.yaml")
+        service = LangChainChatService("configs/chatbots/banking_unsafe.yaml")
         
         # 2. Hacer pregunta
         response, session_id = await service.handle_chat("¿Qué tipos de cuentas ofrecen?")
         
         # 3. Evaluar respuesta
-        evaluator = ResponseEvaluatorService("response_evaluator_config.yaml")
+        evaluator = ResponseEvaluatorService("configs/evaluators/response_evaluator.yaml")
         evaluation = await evaluator.evaluate_response("¿Qué tipos de cuentas ofrecen?", response)
         
         # 4. Verificar que todo funcionó
@@ -201,7 +201,7 @@ class TestEndToEndWorkflow:
     async def test_full_guardrails_workflow(self):
         """Test flujo completo con guardrails"""
         # 1. Crear servicio con guardrails
-        service = LangChainChatService("banking_chat_rai_config.yaml")
+        service = LangChainChatService("configs/chatbots/banking_safe.yaml")
         
         # 2. Probar mensaje seguro
         decision, evaluation, template = await service.apply_input_filters("¿Qué tipos de cuentas ofrecen?")

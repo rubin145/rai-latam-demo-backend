@@ -1,10 +1,12 @@
 import uuid
 import os
-import json
 from typing import Tuple, Dict, Any
 
 from langchain_groq import ChatGroq
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.exceptions import OutputParserException
 
 from ..utils.config_loader import load_yaml
 
@@ -34,20 +36,10 @@ class LangChainChatService:
         
         elif provider == "OPENAI":
             # Future implementation
-            # from langchain_openai import ChatOpenAI
-            # api_key = os.getenv("OPENAI_API_KEY")
-            # if not api_key:
-            #     raise ValueError("OPENAI_API_KEY environment variable is required for OPENAI provider")
-            # self.llm = ChatOpenAI(api_key=api_key, model=cfg.get("model", "gpt-4"), ...)
             raise NotImplementedError("OpenAI provider not yet implemented")
         
         elif provider == "ANTHROPIC":
             # Future implementation
-            # from langchain_anthropic import ChatAnthropic
-            # api_key = os.getenv("ANTHROPIC_API_KEY")
-            # if not api_key:
-            #     raise ValueError("ANTHROPIC_API_KEY environment variable is required for ANTHROPIC provider")
-            # self.llm = ChatAnthropic(api_key=api_key, model=cfg.get("model", "claude-3-sonnet"), ...)
             raise NotImplementedError("Anthropic provider not yet implemented")
         
         else:
@@ -65,22 +57,16 @@ class LangChainChatService:
         self.config = cfg
     
     async def apply_input_filters(self, query: str) -> Tuple[str, str, str]:
-        """Apply input filters to query. Returns (decision, evaluation, template_response)"""
+        """Apply input filters to query using LCEL chains. Returns (decision, evaluation, template_response)"""
         input_filters = self.config.get("input_filters", [])
         
         for filter_config in input_filters:
-            # Create filter LLM with specific settings
-            filter_llm = self._create_filter_llm(filter_config)
-            
-            # Apply filter
-            filter_messages = [
-                SystemMessage(content=filter_config["system_prompt"]),
-                HumanMessage(content=query.strip())
-            ]
+            # Create filter chain using LCEL
+            filter_chain = self._create_filter_chain(filter_config)
             
             try:
-                response = await filter_llm.ainvoke(filter_messages)
-                filter_result = json.loads(response.content)
+                # Execute the filter chain
+                filter_result = await filter_chain.ainvoke({"query": query.strip()})
                 
                 if filter_result.get("decision") == "danger":
                     return (
@@ -88,12 +74,38 @@ class LangChainChatService:
                         f"{filter_config.get('name', 'filter')}: {filter_result.get('evaluation', '')}",
                         filter_config.get("template_response", "Sorry, I can't help with that.")
                     )
-            except (json.JSONDecodeError, Exception) as e:
+            except (OutputParserException, Exception) as e:
                 # If filter fails, log and continue
                 print(f"⚠️ Filter {filter_config.get('name')} failed: {e}")
                 continue
         
         return ("safe", "", "")
+    
+    def _create_filter_chain(self, filter_config: Dict[str, Any]):
+        """Create a specialized LCEL chain for filter with specific configuration."""
+        # Create filter-specific LLM
+        filter_llm = self._create_filter_llm(filter_config)
+        
+        # Escape curly braces in system prompt to prevent variable interpretation
+        system_prompt = filter_config["system_prompt"].replace("{", "{{").replace("}", "}}")
+        
+        # Create the prompt template
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{query}")
+        ])
+        
+        # Create JSON output parser
+        json_parser = JsonOutputParser()
+        
+        # Create and return the LCEL chain
+        chain = (
+            prompt
+            | filter_llm
+            | json_parser
+        )
+        
+        return chain
     
     def _create_filter_llm(self, filter_config: Dict[str, Any]):
         """Create a specialized LLM for filter with specific configuration."""

@@ -21,11 +21,9 @@ app = FastAPI(
 @app.on_event("startup")
 def startup_event():
     """Handles application startup events."""
-    # Initialize chat backend services - provider is determined by config files
-    print("🔀 Using LangChainChatService (banking base)")
-    app.state.base_chat_service = LangChainChatService("banking_chat_config.yaml")
-    print("🔀 Using LangChainChatService (banking guardrails)")
-    app.state.guardrails_chat_service = LangChainChatService("banking_chat_rai_config.yaml")
+    print("🚀 Multi-chatbot service ready")
+    print("📁 Available chatbots: banking")
+    print("🔄 Services created dynamically per request")
 
 # Configure CORS
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
