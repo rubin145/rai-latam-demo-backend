@@ -10,6 +10,7 @@ __pycache__/
 *.md
 
 *.sh
+*.ini
 
 # Distribution / packaging
 .Python

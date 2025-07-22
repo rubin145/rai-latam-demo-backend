@@ -19,11 +19,18 @@ async def chat_chatbot_endpoint(
     use_guardrails: bool = Query(default=True, description="Whether to apply input filters/guardrails")
 ) -> ChatResponse:
     """Main chat endpoint for multi-chatbot support"""
+    # Determine config file based on chatbot and guardrails setting
+    config_suffix = "safe" if use_guardrails else "unsafe"
+    config_path = f"configs/chatbots/{chatbot_id}_{config_suffix}.yaml"
+
+    # Validate that the configuration file for the chatbot exists
+    if not os.path.exists(config_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Chatbot configuration not found for id '{chatbot_id}' with guardrails={use_guardrails}."
+        )
+
     try:
-        # Determine config file based on chatbot and guardrails setting
-        config_suffix = "safe" if use_guardrails else "unsafe"
-        config_path = f"configs/chatbots/{chatbot_id}_{config_suffix}.yaml"
-        
         # Create service dynamically
         chat_service = LangChainChatService(config_path)
         
@@ -66,8 +73,6 @@ async def chat_chatbot_endpoint(
             filter_evaluation="" if use_guardrails else None,
         )
         
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Chatbot '{chatbot_id}' not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,7 +81,7 @@ async def evaluate_response_endpoint(
     request: Request, payload: EvaluateResponseRequest
 ) -> EvaluateResponseResponse:
     """Evaluate a model's response across configured dimensions."""
-    evaluator = ResponseEvaluatorService("configs/evaluators/response_evaluator.yaml")
+    evaluator = ResponseEvaluatorService("configs/evaluators/llm_evaluators.yaml")
     try:
         results = await evaluator.evaluate_response(payload.prompt, payload.response)
         return EvaluateResponseResponse(results=results)

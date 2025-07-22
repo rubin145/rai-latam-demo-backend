@@ -4,10 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from .routers import api
 from .services.langchain_chat import LangChainChatService
+from contextlib import asynccontextmanager
 
 
 # Load environment variables
 load_dotenv()
+
+@asynccontextmanager
+async def lifespan(app):
+    print("🚀 Multi-chatbot service ready")
+    print("📁 Available chatbots: banking")
+    yield
 
 # Create FastAPI application
 app = FastAPI(
@@ -15,15 +22,9 @@ app = FastAPI(
     description="API for demonstrating guardrails and evaluation in LLM based agents",
     version="1.0.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-def startup_event():
-    """Handles application startup events."""
-    print("🚀 Multi-chatbot service ready")
-    print("📁 Available chatbots: banking")
-    print("🔄 Services created dynamically per request")
 
 # Configure CORS
 origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -55,7 +56,7 @@ app.include_router(api.router)
 async def root():
     """Root endpoint"""
     return {
-        "message": "Harm Evaluator API",
+        "message": "RAI Demo API",
         "version": "1.0.0",
         "docs": "/api/docs"
     }

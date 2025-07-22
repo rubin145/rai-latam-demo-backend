@@ -1,5 +1,6 @@
 import uuid
 import os
+import asyncio
 from typing import Tuple, Dict, Any
 
 from langchain_groq import ChatGroq
@@ -7,6 +8,7 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.exceptions import OutputParserException
+from langsmith import traceable, get_current_run_tree
 
 from ..utils.config_loader import load_yaml
 
@@ -57,27 +59,25 @@ class LangChainChatService:
         self.config = cfg
     
     async def apply_input_filters(self, query: str) -> Tuple[str, str, str]:
-        """Apply input filters to query using LCEL chains. Returns (decision, evaluation, template_response)"""
+        """Apply input filters to query using parallel LCEL chains. Returns (decision, evaluation, template_response)"""
         input_filters = self.config.get("input_filters", [])
         
-        for filter_config in input_filters:
-            # Create filter chain using LCEL
-            filter_chain = self._create_filter_chain(filter_config)
-            
-            try:
-                # Execute the filter chain
-                filter_result = await filter_chain.ainvoke({"query": query.strip()})
-                
-                if filter_result.get("decision") == "danger":
-                    return (
-                        "danger",
-                        f"{filter_config.get('name', 'filter')}: {filter_result.get('evaluation', '')}",
-                        filter_config.get("template_response", "Sorry, I can't help with that.")
-                    )
-            except (OutputParserException, Exception) as e:
-                # If filter fails, log and continue
-                print(f"⚠️ Filter {filter_config.get('name')} failed: {e}")
+        # Create all filter tasks
+        filter_tasks = [
+            self._run_single_filter(filter_config, query) 
+            for filter_config in input_filters
+        ]
+        
+        # Wait for all filters to complete
+        results = await asyncio.gather(*filter_tasks, return_exceptions=True)
+        
+        # Check if any filter rejected
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                print(f"Filter {input_filters[i].get('name')} failed: {result}")
                 continue
+            if result and result[0] == "danger":
+                return result
         
         return ("safe", "", "")
     
@@ -107,6 +107,21 @@ class LangChainChatService:
         
         return chain
     
+    async def _run_single_filter(self, filter_config: Dict[str, Any], query: str) -> Tuple[str, str, str]:
+        """Run a single filter and return its result."""
+        try:
+            filter_chain = self._create_filter_chain(filter_config)
+            filter_result = await filter_chain.ainvoke({"query": query.strip()})
+            
+            return (
+                filter_result.get("decision", "safe"),
+                f"{filter_config.get('name', 'filter')}: {filter_result.get('evaluation', '')}",
+                filter_config.get("template_response", "Sorry, I can't help with that.")
+            )
+        except Exception as e:
+            # Return safe on filter failure
+            return ("safe", f"Filter error: {str(e)}", "")
+    
     def _create_filter_llm(self, filter_config: Dict[str, Any]):
         """Create a specialized LLM for filter with specific configuration."""
         if self.provider == "GROQ":
@@ -123,10 +138,21 @@ class LangChainChatService:
         else:
             raise ValueError(f"Unsupported provider for filters: {self.provider}")
     
+    @traceable(name="chat_with_filters")
     async def handle_chat(self, query: str, session_id: str = None) -> Tuple[str, str]:
         """Handle a chat message and return response with session ID."""
         if not session_id:
             session_id = str(uuid.uuid4())
+        
+        # Set session_id in trace metadata for threading
+        if run_tree := get_current_run_tree():
+            run_tree.extra = run_tree.extra or {}
+            run_tree.extra["metadata"] = {"session_id": session_id}
+        
+        # Apply filters if configured
+        filter_result = await self.apply_input_filters(query)
+        if filter_result[0] == "danger":
+            return filter_result[2], session_id  # Return rejection message
         
         # Get or create history for this session
         history = self.chat_history.setdefault(session_id, [])
