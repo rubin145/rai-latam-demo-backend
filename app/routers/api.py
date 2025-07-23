@@ -5,6 +5,7 @@ from ..models.schemas import (
 )
 from ..services.langchain_chat import LangChainChatService
 from ..services.response_evaluator import ResponseEvaluatorService
+from ..services.langsmith_evaluator import LangSmithEvaluatorService
 import json
 import uuid
 import os
@@ -85,6 +86,73 @@ async def evaluate_response_endpoint(
     try:
         results = await evaluator.evaluate_response(payload.prompt, payload.response)
         return EvaluateResponseResponse(results=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/langsmith/evaluate_trace/{run_id}")
+async def evaluate_trace_endpoint(
+    run_id: str,
+    evaluator_names: list[str] = None
+):
+    """Evaluate a specific LangSmith trace by run ID using LLM-as-a-judge evaluators."""
+    evaluator_service = LangSmithEvaluatorService()
+    try:
+        results = await evaluator_service.evaluate_single_trace(run_id, evaluator_names)
+        return {
+            "run_id": run_id,
+            "evaluation_results": results,
+            "evaluators_used": evaluator_names or evaluator_service.evaluator_names
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/langsmith/evaluators")
+async def list_langsmith_evaluators():
+    """List all available LangSmith LLM-as-a-judge evaluators."""
+    evaluator_service = LangSmithEvaluatorService()
+    try:
+        evaluators = evaluator_service.get_available_evaluators()
+        return {
+            "evaluators": evaluators,
+            "count": len(evaluators)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/langsmith/evaluate_response")
+async def evaluate_response_with_langsmith_feedback(
+    request: Request,
+    payload: EvaluateResponseRequest
+):
+    """Evaluate a response and optionally add feedback to a LangSmith trace."""
+    evaluator_service = LangSmithEvaluatorService()
+    
+    # Get optional run_id from headers or query params
+    run_id = request.headers.get("x-langsmith-run-id") or request.query_params.get("run_id")
+    
+    try:
+        if run_id:
+            # Evaluate and add feedback to trace
+            results = await evaluator_service.evaluate_and_add_feedback(
+                run_id=run_id,
+                prompt=payload.prompt,
+                response=payload.response
+            )
+            return {
+                "evaluation_results": results,
+                "langsmith_feedback_added": True,
+                "run_id": run_id
+            }
+        else:
+            # Just evaluate without adding to trace
+            results = await evaluator_service.response_evaluator.evaluate_response(
+                payload.prompt, payload.response
+            )
+            return {
+                "evaluation_results": results,
+                "langsmith_feedback_added": False
+            }
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

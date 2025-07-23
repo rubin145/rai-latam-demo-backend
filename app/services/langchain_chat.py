@@ -57,6 +57,14 @@ class LangChainChatService:
         
         # Load full config for filters
         self.config = cfg
+        
+        # Initialize LangSmith evaluator for automatic feedback
+        try:
+            from .langsmith_evaluator import LangSmithEvaluatorService
+            self.langsmith_evaluator = LangSmithEvaluatorService()
+        except Exception as e:
+            print(f"⚠️ LangSmith evaluator initialization failed: {e}")
+            self.langsmith_evaluator = None
     
     async def apply_input_filters(self, query: str) -> Tuple[str, str, str]:
         """Apply input filters to query using parallel LCEL chains. Returns (decision, evaluation, template_response)"""
@@ -180,5 +188,21 @@ class LangChainChatService:
             if tail_size > 0:
                 new_history.extend(history[-tail_size:])
             history[:] = new_history
+        
+        # Run LLM-as-a-judge evaluations and add feedback to LangSmith trace
+        if self.langsmith_evaluator and run_tree:
+            try:
+                run_id = run_tree.id
+                # Run evaluations in background to not block the response
+                asyncio.create_task(
+                    self.langsmith_evaluator.evaluate_and_add_feedback(
+                        run_id=run_id,
+                        prompt=query,
+                        response=content,
+                        session_id=session_id
+                    )
+                )
+            except Exception as e:
+                print(f"⚠️ LLM-as-a-judge evaluation failed: {e}")
         
         return content, session_id

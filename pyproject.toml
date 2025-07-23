@@ -16,6 +16,7 @@ langchain-groq = "^0.2.0"
 pytest = "^8.0.0"
 pytest-asyncio = "^0.23.0"
 langsmith = "^0.4.8"
+uvicorn = "^0.24.0"
 
 
 [build-system]
