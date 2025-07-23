@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException, Request, Response, Query
+from fastapi import APIRouter, HTTPException, Request, Response, Query, BackgroundTasks
 from ..models.schemas import (
     ChatRequest, ChatResponse,
     EvaluateResponseRequest, EvaluateResponseResponse,
+    HumanFeedbackRequest, HumanFeedbackResponse,
 )
 from ..services.langchain_chat import LangChainChatService
 from ..services.response_evaluator import ResponseEvaluatorService
+from ..dependencies import get_evaluation_service
 import json
 import uuid
 import os
@@ -16,9 +18,10 @@ async def chat_chatbot_endpoint(
     chatbot_id: str,
     chat_request: ChatRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     use_guardrails: bool = Query(default=True, description="Whether to apply input filters/guardrails")
 ) -> ChatResponse:
-    """Main chat endpoint for multi-chatbot support"""
+    """Main chat endpoint for multi-chatbot support with integrated evaluation"""
     # Determine config file based on chatbot and guardrails setting
     config_suffix = "safe" if use_guardrails else "unsafe"
     config_path = f"configs/chatbots/{chatbot_id}_{config_suffix}.yaml"
@@ -31,8 +34,11 @@ async def chat_chatbot_endpoint(
         )
 
     try:
-        # Create service dynamically
+        # Create chat service
         chat_service = LangChainChatService(config_path)
+        
+        # Get evaluation service for real-time feedback
+        eval_service = get_evaluation_service(chatbot_id)
         
         # Apply input filters if guardrails are enabled
         if use_guardrails:
@@ -50,12 +56,21 @@ async def chat_chatbot_endpoint(
                     filter_evaluation=filter_evaluation,
                 )
         
-        # Process chat normally
+        # Get real-time evaluation callbacks
+        callbacks = eval_service.get_realtime_callbacks()
+        
+        # Process chat with evaluation callbacks
         print(f"👤 User ({chatbot_id}) -> {chat_request.query!r} (session_id={chat_request.session_id!r})")
+        
+        # Modified to include callbacks for real-time evaluation
         message, session_id = await chat_service.handle_chat(
-            chat_request.query, chat_request.session_id
+            chat_request.query, 
+            chat_request.session_id,
+            callbacks=callbacks  # Pass evaluation callbacks
         )
+        
         print(f"🤖 Agent ({chatbot_id}) -> {message!r} (session_id={session_id!r})")
+        print(f"📊 [EVALUATION] Real-time feedback active for {chatbot_id}")
         
         # Set session cookie if needed
         if not chat_request.session_id:
@@ -93,12 +108,14 @@ async def chat_endpoint(
     request: Request,
     chat_request: ChatRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
 ) -> ChatResponse:
     """Legacy endpoint for standard chat - routes to banking_unsafe"""
     return await chat_chatbot_endpoint(
         chatbot_id="banking",
         chat_request=chat_request,
         response=response,
+        background_tasks=background_tasks,
         use_guardrails=False
     )
 
@@ -107,11 +124,50 @@ async def chat_guardrails_endpoint(
     request: Request,
     chat_request: ChatRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
 ) -> ChatResponse:
     """Legacy endpoint for chat with guardrails - routes to banking_safe"""
     return await chat_chatbot_endpoint(
         chatbot_id="banking",
         chat_request=chat_request,
         response=response,
+        background_tasks=background_tasks,
         use_guardrails=True
     )
+
+# New Integrated Evaluation Endpoints
+
+@router.post("/feedback", response_model=HumanFeedbackResponse)
+async def submit_human_feedback(
+    feedback: HumanFeedbackRequest,
+    project_name: str = Query(default="banking", description="Project name for evaluation service")
+) -> HumanFeedbackResponse:
+    """Submit human feedback (thumbs up/down, ratings) for a conversation turn"""
+    try:
+        eval_service = get_evaluation_service(project_name)
+        result = await eval_service.record_human_feedback(
+            run_id=feedback.run_id,
+            feedback_type=feedback.feedback_type,
+            value=feedback.value,
+            comment=feedback.comment
+        )
+        return HumanFeedbackResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/evaluate_response_integrated", response_model=EvaluateResponseResponse)
+async def evaluate_response_integrated_endpoint(
+    request: EvaluateResponseRequest,
+    project_name: str = Query(default="banking", description="Project name for evaluation service")
+) -> EvaluateResponseResponse:
+    """On-demand response evaluation using the integrated evaluation service"""
+    try:
+        eval_service = get_evaluation_service(project_name)
+        results = await eval_service.evaluate_on_demand(
+            prompt=request.prompt,
+            response=request.response
+        )
+        return EvaluateResponseResponse(results=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

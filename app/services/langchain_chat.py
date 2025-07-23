@@ -139,7 +139,7 @@ class LangChainChatService:
             raise ValueError(f"Unsupported provider for filters: {self.provider}")
     
     @traceable(name="chat_with_filters")
-    async def handle_chat(self, query: str, session_id: str = None) -> Tuple[str, str]:
+    async def handle_chat(self, query: str, session_id: str = None, callbacks=None) -> Tuple[str, str]:
         """Handle a chat message and return response with session ID."""
         if not session_id:
             session_id = str(uuid.uuid4())
@@ -164,8 +164,8 @@ class LangChainChatService:
         # Add user message
         history.append(HumanMessage(content=query.strip()))
         
-        # Generate response
-        response = await self.llm.ainvoke(history)
+        # Generate response with callbacks for evaluation
+        response = await self.llm.ainvoke(history, callbacks=callbacks or [])
         content = response.content
         
         # Add assistant response to history

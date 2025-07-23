@@ -1,0 +1,28 @@
+# Real-time evaluation configuration for banking project
+# This config defines which evaluators run automatically during chat interactions
+
+realtime_feedback:
+  # Lightweight evaluators (always enabled, no LLM calls)
+  lightweight:
+    - response_length      # Check for too short (<10) or too long (>2000) responses
+    - language_detection   # Verify response is in Portuguese
+    - content_safety       # Basic regex patterns for URLs, emails, phone numbers
+  
+  # LLM-based evaluators (configurable sampling to manage costs)
+  llm_sampled:
+    - name: toxicity
+      sampling_rate: 0.10  # Evaluate 10% of responses for toxicity
+      source: "llm_evaluators.yaml"
+      description: "Real-time toxicity detection with 10% sampling"
+    
+    - name: topic_adherence  
+      sampling_rate: 0.05  # Evaluate 5% of responses for topic adherence
+      source: "llm_evaluators.yaml"
+      description: "Banking topic compliance with 5% sampling"
+
+# Configuration notes:
+# - Lightweight evaluators run on every response (minimal performance impact)
+# - LLM evaluators use sampling to balance quality monitoring with cost/latency
+# - All evaluations are sent to LangSmith as background tasks
+# - Sampling rates can be adjusted based on traffic and budget
+# - Higher sampling rates provide better coverage but increase costs
