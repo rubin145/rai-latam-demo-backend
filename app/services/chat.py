@@ -11,44 +11,22 @@ from langchain_core.exceptions import OutputParserException
 from langsmith import traceable, get_current_run_tree
 
 from ..utils.config_loader import load_yaml
+from .llm_manager import LLMManager
 
 
-class LangChainChatService:
+class ChatService:
     """Generic chat service implementation using LangChain with multiple providers."""
     
     def __init__(self, config_path: str):
         cfg = load_yaml(config_path)
         
-        # Get provider configuration
-        provider = cfg.get("provider", "GROQ").upper()
-        
-        # Initialize LangChain LLM based on provider
-        if provider == "GROQ":
-            api_key = os.getenv("GROQ_API_KEY")
-            if not api_key:
-                raise ValueError("GROQ_API_KEY environment variable is required for GROQ provider")
-            
-            self.llm = ChatGroq(
-                groq_api_key=api_key,
-                model_name=cfg.get("model", "llama3-70b-8192"),
-                temperature=cfg.get("inference", {}).get("temperature", 0.7),
-                max_tokens=cfg.get("inference", {}).get("max_tokens", 400),
-                model_kwargs={"seed": cfg.get("inference", {}).get("seed", 42)}
-            )
-        
-        elif provider == "OPENAI":
-            # Future implementation
-            raise NotImplementedError("OpenAI provider not yet implemented")
-        
-        elif provider == "ANTHROPIC":
-            # Future implementation
-            raise NotImplementedError("Anthropic provider not yet implemented")
-        
-        else:
-            raise ValueError(f"Unsupported provider: {provider}. Supported providers: GROQ")
+        # Initialize LLMManager
+        self.llm_manager = LLMManager()
+        self.llm = self.llm_manager.get_llm(model=cfg.get("model", "llama3-8b-8192"),                                      
+                                            provider=cfg.get("provider", "GROQ"),
+                                            inference_config=cfg.get("inference", {}))
         
         # Configuration
-        self.provider = provider
         self.system_prompt = cfg.get("system_prompt", "")
         self.max_history = cfg.get("max_history", 20)
         
@@ -60,8 +38,8 @@ class LangChainChatService:
         
         # Initialize LangSmith evaluator for automatic feedback
         try:
-            from .langsmith_evaluator import LangSmithEvaluatorService
-            self.langsmith_evaluator = LangSmithEvaluatorService()
+            from .langsmith_client import LangSmithClient
+            self.langsmith_evaluator = LangSmithClient()
         except Exception as e:
             print(f"⚠️ LangSmith evaluator initialization failed: {e}")
             self.langsmith_evaluator = None
@@ -94,12 +72,9 @@ class LangChainChatService:
         # Create filter-specific LLM
         filter_llm = self._create_filter_llm(filter_config)
         
-        # Escape curly braces in system prompt to prevent variable interpretation
-        system_prompt = filter_config["system_prompt"].replace("{", "{{").replace("}", "}}")
-        
         # Create the prompt template
         prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
+            ("system", filter_config["system_prompt"]),
             ("human", "{query}")
         ])
         
@@ -132,35 +107,30 @@ class LangChainChatService:
     
     def _create_filter_llm(self, filter_config: Dict[str, Any]):
         """Create a specialized LLM for filter with specific configuration."""
-        if self.provider == "GROQ":
-            return ChatGroq(
-                groq_api_key=os.getenv("GROQ_API_KEY"),
-                model_name=filter_config.get("model", "llama3-70b-8192"),
-                temperature=filter_config.get("inference", {}).get("temperature", 0.0),
-                max_tokens=filter_config.get("inference", {}).get("max_tokens", 150),
-                model_kwargs={"seed": filter_config.get("inference", {}).get("seed", 42)}
-            )
-        elif self.provider == "OPENAI":
-            # Future: Create OpenAI filter LLM
-            raise NotImplementedError("OpenAI filter LLM not implemented")
-        else:
-            raise ValueError(f"Unsupported provider for filters: {self.provider}")
+        llm_manager = LLMManager()
+        return llm_manager.get_llm(
+            provider=filter_config.get("provider", "GROQ"),
+            model=filter_config.get("model", "llama3-8b-8192"), 
+            inference_config=filter_config.get("inference", {})
+        )
     
     @traceable(name="chat_with_filters")
-    async def handle_chat(self, query: str, session_id: str = None) -> Tuple[str, str]:
-        """Handle a chat message and return response with session ID."""
+    async def handle_chat(self, query: str, session_id: str = None) -> Tuple[str, str, str]:
+        """Handle a chat message and return response with session ID and run ID."""
         if not session_id:
             session_id = str(uuid.uuid4())
         
-        # Set session_id in trace metadata for threading
+        # Get run_id for LangSmith tracing
+        run_id = None
         if run_tree := get_current_run_tree():
             run_tree.extra = run_tree.extra or {}
             run_tree.extra["metadata"] = {"session_id": session_id}
+            run_id = str(run_tree.id)
         
         # Apply filters if configured
         filter_result = await self.apply_input_filters(query)
         if filter_result[0] == "danger":
-            return filter_result[2], session_id  # Return rejection message
+            return filter_result[2], session_id, run_id  # Return rejection message
         
         # Get or create history for this session
         history = self.chat_history.setdefault(session_id, [])
@@ -205,4 +175,4 @@ class LangChainChatService:
             except Exception as e:
                 print(f"⚠️ LLM-as-a-judge evaluation failed: {e}")
         
-        return content, session_id
+        return content, session_id, run_id
