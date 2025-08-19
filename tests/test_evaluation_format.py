@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-from app.services.response_evaluator import ResponseEvaluatorService
+from app.services.evaluators import LLMEvaluator
 
 
 class TestEvaluatorOutputFormat:
@@ -20,7 +20,7 @@ class TestEvaluatorOutputFormat:
     @pytest.fixture
     def evaluator_service(self):
         """Fixture para el servicio de evaluador"""
-        return ResponseEvaluatorService("configs/evaluators/llm_evaluators.yaml")
+        return LLMEvaluator("configs/evaluators/llm_evaluators.yaml")
     
     @pytest.mark.asyncio
     async def test_criteria_evaluator_format(self, evaluator_service):

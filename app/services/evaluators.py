@@ -1,82 +1,63 @@
-import os
-from typing import Any, Dict
-
-from langchain_groq import ChatGroq
+from typing import Dict, Any
 from langchain.evaluation.criteria import CriteriaEvalChain
 from langchain.evaluation.scoring import ScoreStringEvalChain
 from langchain_core.prompts import PromptTemplate
 from langchain_core.exceptions import OutputParserException
 
 from ..utils.config_loader import load_yaml
+from .llm_manager import LLMManager
 
-
-class ResponseEvaluatorService:
+class LLMEvaluator:
     """
     LangChain-native service to evaluate model responses using standard evaluators.
-    
+
     Features:
     - Uses native LangChain evaluators (CriteriaEvaluator, ScoreStringEvaluator)
-    - Custom prompt templates in Portuguese 
-    - Independent service with no external dependencies
-    - Compatible with LangSmith for dataset evaluation
+    - Custom prompt templates
+    - Compatible with LangSmith for dataset evaluation and for real-time feedback
     """
-    
     def __init__(self, config_path: str):
+        """
+        Args:
+            config_path: Path to evaluator configuration file.
+
+        Raises:
+            ValueError: If no evaluators are configured.
+        """
         self.config = load_yaml(config_path)
         self.evaluator_configs = self.config.get("response_evaluators", [])
-        
-        # Validate configuration
+        self.llm_manager = LLMManager()
+
         if not self.evaluator_configs:
             raise ValueError("No evaluators configured in response_evaluators")
-        
-        # Initialize evaluators
+
         self.evaluators = {}
         self._initialize_evaluators()
-    
-    def _create_llm(self, evaluator_config: Dict[str, Any]) -> ChatGroq:
-        """Create LLM instance for a specific evaluator"""
-        provider = evaluator_config.get("provider", "GROQ").upper()
-        
-        if provider != "GROQ":
-            raise ValueError(f"Unsupported provider: {provider}")
-        
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY environment variable is required")
-        
-        model = evaluator_config.get("model", "llama3-8b-8192")
-        inference_config = evaluator_config.get("inference", {})
-        
-        return ChatGroq(
-            groq_api_key=api_key,
-            model_name=model,
-            temperature=inference_config.get("temperature", 0.0),
-            max_tokens=inference_config.get("max_tokens", 150),
-            model_kwargs={"seed": inference_config.get("seed", 42)}
-        )
-    
-    def _create_prompt_template(self, prompt_template_str: str) -> PromptTemplate:
-        """Create LangChain PromptTemplate from string"""
-        return PromptTemplate.from_template(prompt_template_str)
-    
+
     def _initialize_evaluators(self):
-        """Initialize LangChain evaluators based on configuration"""
+        """
+        Initialize evaluators based on configuration.
+
+        Raises:
+            ValueError: If evaluator type is unsupported.
+        """
         for config in self.evaluator_configs:
             name = config.get("name")
             evaluator_type = config.get("type")
-            
-            # Create LLM for this evaluator
-            llm = self._create_llm(config)
-            
+            provider = config.get("provider", "GROQ")
+            model = config.get("model", "llama3-8b-8192")
+            inference_config = config.get("inference", {})
+
+            llm = self.llm_manager.get_llm(provider, model, inference_config)
+
             # Create custom prompt template if provided
             custom_prompt = None
             if "prompt_template" in config:
-                custom_prompt = self._create_prompt_template(config["prompt_template"])
-            
-            # Create evaluator based on type
+                custom_prompt = PromptTemplate.from_template(config["prompt_template"])
+
             # Use custom criteria format: {name: description}
             custom_criteria = {config.get("name", "custom"): config["criteria"]}
-            
+
             if evaluator_type == "criteria":
                 evaluator = CriteriaEvalChain.from_llm(
                     llm=llm,
@@ -91,7 +72,7 @@ class ResponseEvaluatorService:
                 )
             else:
                 raise ValueError(f"Unsupported evaluator type: {evaluator_type}. Supported types: ['criteria', 'score_string']")
-            
+
             self.evaluators[name] = {
                 "evaluator": evaluator,
                 "type": evaluator_type,
@@ -187,7 +168,6 @@ class ResponseEvaluatorService:
     async def evaluate_single(self, evaluator_name: str, prompt: str, response: str) -> Dict[str, Any]:
         """
         Evaluate using a single evaluator by name.
-        Useful for testing or selective evaluation.
         """
         if evaluator_name not in self.evaluators:
             return {
@@ -233,3 +213,87 @@ class ResponseEvaluatorService:
         Returns list of LangChain evaluator objects.
         """
         return [info["evaluator"] for info in self.evaluators.values()]
+
+
+class LightEvaluator:
+    """
+    Class to handle lightweight evaluations.
+    """
+    def __init__(self):
+        self.evaluators = {
+            'response_length': self._evaluate_response_length,
+            'language_detection': self._evaluate_language,
+            'content_safety': self._evaluate_content_safety
+        }
+
+    def _evaluate_response_length(self, response: str) -> Dict[str, Any]:
+        """Evaluate response length (10-2000 characters optimal)"""
+        length = len(response)
+        score = 1.0 if 10 <= length <= 2000 else 0.3
+        comment = f"Response length: {length} characters"
+        if length < 10:
+            comment += " (too short)"
+        elif length > 2000:
+            comment += " (too long)"
+        else:
+            comment += " (optimal)"
+
+        return {
+            "score": score,
+            "comment": comment,
+            "evaluator": "response_length"
+        }
+
+    def _evaluate_language(self, response: str) -> Dict[str, Any]:
+        """Basic language detection using character patterns"""
+        expected_language = "pt"
+
+        # Simple Portuguese indicators
+        pt_indicators = ['ã', 'ç', 'ção', 'ões', 'ão', 'em', 'de', 'do', 'da', 'para', 'com']
+
+        if expected_language == "pt":
+            pt_count = sum(1 for indicator in pt_indicators if indicator in response.lower())
+            score = min(pt_count / 3, 1.0)  # Normalize to 0-1
+        else:
+            score = 1.0  # Default pass for other languages
+
+        return {
+            "score": score,
+            "comment": f"Language detection score: {score:.2f} for {expected_language}",
+            "evaluator": "language_detection"
+        }
+
+    def _evaluate_content_safety(self, response: str) -> Dict[str, Any]:
+        """Basic content safety using regex patterns"""
+        import re
+
+        # Patterns for potentially sensitive content
+        patterns = {
+            'url': r'https?://[^\s]+',
+            'email': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            'phone': r'\b\d{10,11}\b',  # Basic phone number pattern
+        }
+
+        issues = []
+        for pattern_name, pattern in patterns.items():
+            if re.search(pattern, response):
+                issues.append(pattern_name)
+
+        score = 1.0 if not issues else 0.5
+        comment = f"Content safety check: {issues if issues else 'clean'}"
+
+        return {
+            "score": score,
+            "comment": comment,
+            "evaluator": "content_safety"
+        }
+
+    def run_evaluations(self, response: str) -> Dict[str, Any]:
+        """Run all lightweight evaluations."""
+        results = {}
+        for name, evaluator_func in self.evaluators.items():
+            try:
+                results[name] = evaluator_func(response)
+            except Exception as e:
+                results[name] = {"error": str(e), "evaluator": name}
+        return results

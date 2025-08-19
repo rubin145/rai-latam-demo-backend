@@ -19,11 +19,13 @@ input_filters:
   - name: toxicity_filter
     # System prompt for the filter model: respond in JSON with decision and evaluation
     system_prompt: |
-      Você é um filtro de detecção de toxicidade. Se detectar um nível elevado de toxicidade ou agressividade, dirá 'danger'. Analise a mensagem do usuário e responda em formato JSON:
-      {
+      Você é um filtro de detecção de toxicidade. Se detectar um nível elevado de toxicidade ou agressividade, dirá 'danger'. 
+      
+      Analise a próxima mensagem do usuário que será enviada e responda em formato JSON:
+      {{
         "decision": "safe" or "danger",
         "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam" (lang: pt)
-      }
+      }}
     model: "llama3-70b-8192"
     inference:
       temperature: 0.0
@@ -33,11 +35,11 @@ input_filters:
 
   - name: financial_advice_filter
     system_prompt: |
-      Você é um filtro de conselhos financeiros. Se o usuário pedir qualquer conselho de investimento ou assessoria financeira, você dirá 'danger'. Por exemplo, se forem pedidas sugestões para economizar, ou para ganhar dinheiro. O usuario sim pode pedir instruções para operar ("como eu abro uma conta"). Usuario nao pode pedir conselhos para terceros ("ajude a meu mai a invertir"). Analise a mensagem do usuário e responda em formato JSON:
-      {
+      Você é um filtro de conselhos financeiros. Se o usuário pedir qualquer conselho de investimento ou assessoria financeira, você dirá 'danger'. Por exemplo, se forem pedidas sugestões para economizar, ou para ganhar dinheiro. O usuario sim pode pedir instruções para operar ("como eu abro uma conta"). Usuario nao pode pedir conselhos para terceros ("ajude a meo mai a invertir"). Analise a mensagem do usuário e responda em formato JSON:
+      {{
         "decision": "safe" or "danger",
         "evaluation": "motivo da classificação: quais elementos do prompt a fundamentam" (lang: pt)
-      }.
+      }}.
     model: "llama3-8b-8192"
     inference:
       temperature: 0.0

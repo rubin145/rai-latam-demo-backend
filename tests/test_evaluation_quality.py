@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-from app.services.langchain_chat import LangChainChatService
-from app.services.response_evaluator import ResponseEvaluatorService
+from app.services.chat import ChatService
+from app.services.evaluators import LLMEvaluator, LightEvaluator
 
 
 class TestEvaluationContent:
@@ -22,12 +22,12 @@ class TestEvaluationContent:
     @pytest.fixture
     def chat_service(self):
         """Fixture para el servicio de chat con guardrails"""
-        return LangChainChatService("configs/chatbots/banking_safe.yaml")
+        return ChatService("configs/chatbots/banking_safe.yaml")
     
     @pytest.fixture
     def evaluator_service(self):
         """Fixture para el servicio de evaluador"""
-        return ResponseEvaluatorService("configs/evaluators/llm_evaluators.yaml")
+        return LLMEvaluator("configs/evaluators/llm_evaluators.yaml")
     
     @pytest.mark.asyncio
     async def test_input_filters_safe_prompts(self, chat_service):
